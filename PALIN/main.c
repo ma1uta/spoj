@@ -2,15 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-int check(const char* x, int len) {
-  for (int i = 0; i < len / 2; i++) {
-    if (x[i] != x[len - i - 1]) {
-      return 0;
-    }
-  }
-  return 1;
-}
-
 char* inc_from(char* x, size_t* len, size_t from) {
   int shift = 0;
   for (int i = from; i > -1; i--) {
@@ -50,11 +41,13 @@ int main(int argc, char** argv) {
     size_t len = strlen(num);
     if (!len) {
       printf("1\n");
+      free(num);
       continue;
     }
     num = inc(num, &len);
     if (len == 1) {
       printf("%s\n", num);
+      free(num);
       continue;
     }
     int med = len / 2;
@@ -81,6 +74,7 @@ int main(int argc, char** argv) {
       right++;
     }
     printf("%s\n", num);
+    free(num);
   }
 
   return 0;
