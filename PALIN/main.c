@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_NUMBER_LENGTH 1000001
+
+// increment from specified position
 char* inc_from(char* x, size_t* len, size_t from) {
   int shift = 0;
   for (int i = from; i > -1; i--) {
@@ -16,18 +19,16 @@ char* inc_from(char* x, size_t* len, size_t from) {
     }
   }
   if (shift) {
-    char* old = x;
-    x = malloc((*len) + 2);
-    x[0] = '1';
-    for (int i = 0; i < *len; i++) {
-      x[i + 1] = old[i];
+    for (int i = *len - 1; i > -1; i--) {
+      x[i + 1] = x[i];
     }
-    free(old);
+    x[0] = '1';
     (*len)++;
   }
   return x;
 }
 
+// increment
 char* inc(char* x, size_t* len) {
   return inc_from(x, len, *len - 1);
 }
@@ -35,47 +36,62 @@ char* inc(char* x, size_t* len) {
 int main(int argc, char** argv) {
   int count;
   scanf("%d\n", &count);
+  char* num = malloc(MAX_NUMBER_LENGTH * sizeof(char));
   for (int i = 0; i < count; i++) {
-    char* num = malloc(1000001);
+    for (int j = 0; num[j] != '\0' || j < MAX_NUMBER_LENGTH; j++) {
+      num[j] = '\0';
+    }
     scanf("%s\n", num);
     size_t len = strlen(num);
     if (!len) {
       printf("1\n");
-      free(num);
       continue;
     }
     num = inc(num, &len);
     if (len == 1) {
       printf("%s\n", num);
-      free(num);
       continue;
     }
+    // find a median
     int med = len / 2;
+    // left pointer
     int left = med - 1;
+    // right pointer
     int right = med + (len % 2);
+    // flag is right part was increased
     int increased = 0;
     while (left > -1 && right < len) {
+      // char at left pointer
       int leftNum = (int) (num[left] - '0');
+      // char at right pointer
       int rightNum = (int) (num[right] - '0');
+      // if left char greater than right
       if (leftNum > rightNum) {
+        // that mirror left char and store that we increased right part
         num[right] = '0' + (char) leftNum;
         increased = 1;
-      } else if (leftNum < rightNum) {
+      } else if (leftNum < rightNum) { // otherwise
+        // if right part was increased
         if (increased) {
+          // then mirror right part
           num[right] = '0' + (char) leftNum;
         } else {
+          // else increment the median
+          // and start again from median
           num = inc_from(num, &len, med - 1 + (len % 2));
           left = med;
           right = med + (len % 2) - 1;
           increased = 1;
         }
       }
+      // move left pointer to left
       left--;
+      // and right to right
       right++;
     }
     printf("%s\n", num);
-    free(num);
   }
+  free(num);
 
   return 0;
 }
