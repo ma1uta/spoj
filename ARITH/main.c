@@ -38,6 +38,7 @@ void plus(struct expression_t* exp);
 void minus(struct expression_t* exp);
 void mult(struct expression_t* exp);
 void print(const struct expression_t* exp);
+void trim(struct expression_t* exp, size_t line, size_t max);
 
 void calc(const char* input) {
     struct expression_t exp;
@@ -90,22 +91,21 @@ void plus(struct expression_t* exp) {
         char c2 = (i < exp->len2) ? exp->arg2[i] : '0';
         unsigned long d1 = (unsigned long) (c1 - '0');
         unsigned long d2 = (unsigned long) (c2 - '0');
-        char sum_str[3];
         unsigned long sum = d1 + d2 + shift;
-        snprintf(sum_str, 3, "%ld", (d1 + d2 + shift));
         if (sum > 9) {
-            exp->res[0][i] = sum_str[1];
-            shift = 1;
+            shift = sum / 10;
+            sum %= 10;
         } else {
-            exp->res[0][i] = sum_str[0];
             shift = 0;
         }
+        exp->res[0][i] = (char) sum + '0';
         i++;
     }
-    if (shift) {
+    if (shift != 0) {
         exp->res[0][i++] = '1';
     }
-    exp->res[0][i+1] = '\0';
+    exp->res[0][i] = '\0';
+    trim(exp, 0, i);
 }
 
 void minus(struct expression_t* exp) {
@@ -121,23 +121,18 @@ void minus(struct expression_t* exp) {
         char c2 = (i < exp->len2) ? exp->arg2[i] : '0';
         long d1 = (long) (c1 - '0');
         long d2 = (long) (c2 - '0');
-        char sum_str[2];
         long sub = d1 - d2 - shift;
         if (sub < 0) {
-            sub += 10;
+            sub = (sub + 10) % 10;
             shift = 1;
         } else {
             shift = 0;
         }
-        snprintf(sum_str, 2, "%ld", sub);
-        exp->res[0][i] = sum_str[0];
+        exp->res[0][i] = (char) sub + '0';
         i++;
     }
-    for (size_t j = 0; j < i; j++) {
-        if (exp->res[0][i - j - 1] == '0') {
-            exp->res[0][i - j - 1] = '\0';
-        }
-    }
+    exp->res[0][exp->len1] = '\0';
+    trim(exp, 0, exp->len1);
 }
 
 void mult(struct expression_t* exp) {
@@ -166,9 +161,10 @@ void mult(struct expression_t* exp) {
                 mem = mem / 10;
             }
             exp->res[i][j] = '\0';
+            trim(exp, i, j);
         }
     }
-    unsigned long max = 0;
+    size_t max = 0;
     size_t* lengths = malloc(sizeof (size_t) * (exp->res_count - 1));
     for (size_t i = 0; i < exp->res_count - 1; i++) {
         lengths[i] = strlen(exp->res[i]);
@@ -178,39 +174,48 @@ void mult(struct expression_t* exp) {
     unsigned long offset = 0;
     for (size_t i = 0; i < max; i++) {
         unsigned long sum = 0;
-        size_t min = MIN(i, exp->res_count - 1);
+        size_t min = MIN(i, exp->res_count - 2);
         for (size_t j = 0; j <= min; j++) {
             if (lengths[j] + j > i) {
-                sum += (unsigned long) (exp->res[j][i - j] - '0') + offset;
-                if (sum > 9) {
-                    offset = sum / 10;
-                    sum %= 10;
-                }
+                sum += (unsigned long) (exp->res[j][i - j] - '0');
             }
+        }
+        sum += offset;
+        if (sum > 9) {
+            offset = sum / 10;
+            sum %= 10;
+        } else {
+            offset = 0;
         }
         exp->res[exp->res_count - 1][i] = (char) sum + '0';
     }
     if (offset > 0) {
         exp->res[exp->res_count - 1][max] = (char) offset + '0';
-        exp->res[exp->res_count - 1][max + 1] = '\0';
+        exp->res[exp->res_count - 1][++max] = '\0';
     } else {
         exp->res[exp->res_count - 1][max] = '\0';
     }
+    trim(exp, exp->res_count - 1, max);
+    free(lengths);
+}
+
+void trim(struct expression_t* exp, size_t line, size_t max)
+{
     for (size_t i = 0; i < max - 1; i++) {
-        if (exp->res[exp->res_count - 1][max - i - 1] == '0') {
-            exp->res[exp->res_count - 1][max - i - 1] = '\0';
+        if (exp->res[line][max - i - 1] == '0') {
+            exp->res[line][max - i - 1] = '\0';
         } else {
             break;
         }
     }
-    free(lengths);
 }
 
 void print(const struct expression_t* exp) {
     size_t max = MAX(exp->len1, exp->len2 + 1);
-    for (size_t i = 0; i < exp->res_count; i++) {
-        max = MAX(max, strlen(exp->res[i]));
+    for (size_t i = 0; i < exp->res_count - 1; i++) {
+        max = MAX(max, strlen(exp->res[i]) + i);
     }
+    max = MAX(max, strlen(exp->res[exp->res_count - 1]));
 
     for (size_t i = 0; i < max - exp->len1; i++) {
         fputc(' ', stdout);
@@ -229,8 +234,9 @@ void print(const struct expression_t* exp) {
     }
     fputc('\n', stdout);
 
+    size_t max1 = MAX(exp->len2 + 1, strlen(exp->res[0]));
     for (size_t i = 0; i < max; i++) {
-        fputc(i < MIN(max - exp->len2 - 1, max - exp->len1) ? ' ' : '-', stdout);
+        fputc(i < max - max1 ? ' ' : '-', stdout);
     }
     fputc('\n', stdout);
 
@@ -245,7 +251,11 @@ void print(const struct expression_t* exp) {
         fputc('\n', stdout);
     }
     if (exp->operator == '*' && exp->res_count > 2) {
-        for (size_t i = 0; i < max; i++) {
+        size_t max2 = MAX(strlen(exp->res[exp->res_count - 1]), strlen(exp->res[exp->res_count - 2]));
+        for (size_t i = 0; i < max - max2; i++) {
+            fputc(' ', stdout);
+        }
+        for (size_t i = 0; i < max2; i++) {
             fputc('-', stdout);
         }
         fputc('\n', stdout);
@@ -262,4 +272,5 @@ void print(const struct expression_t* exp) {
         }
         fputc('\n', stdout);
     }
+    fputc('\n', stdout);
 }
